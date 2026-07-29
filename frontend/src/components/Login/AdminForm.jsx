@@ -31,7 +31,7 @@ function AdminLogin() {
         {
           email: formData.email,
           password: formData.password,
-        }
+        },
       );
       if (response.data.data.user.roles !== "admin") {
         toast.error("Access denied. Only Admin are allowed to log in.");
@@ -40,9 +40,24 @@ function AdminLogin() {
       }
       setSpinner(false);
       const { token } = response.data;
-      const name = response.data.data.user.name;
-      localStorage.setItem("Admin Name", name);
+      const user = response.data.data.user;
+
+      localStorage.setItem("Admin Name", user.name);
       localStorage.setItem("jwtToken", token);
+
+      // Common authentication data
+      localStorage.setItem("authToken", token);
+      localStorage.setItem(
+        "currentUser",
+        JSON.stringify({
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.roles,
+          admissionStatus: user.admissionStatus,
+        }),
+      );
+
       navigate("/admin/dashboard");
       toast.success("Logged in");
     } catch (error) {
@@ -65,8 +80,13 @@ function AdminLogin() {
           <div className="bg-white dark:bg-slate-800 dark:text-white dark:border-gray-200 rounded-lg shadow-lg p-8 w-full max-w-md">
             <div className="flex flex-col items-center">
               <h2 className="font-bold text-2xl">Admin Login</h2>
-              <p className="text-sm mt-4">If you are already a member, easy login</p>
-              <form className="flex flex-col gap-3 mt-4 w-full" onSubmit={submitHandler}>
+              <p className="text-sm mt-4">
+                If you are already a member, easy login
+              </p>
+              <form
+                className="flex flex-col gap-3 mt-4 w-full"
+                onSubmit={submitHandler}
+              >
                 <input
                   className="mt-3 p-2 border rounded dark:bg-slate-700"
                   type="email"
@@ -75,7 +95,7 @@ function AdminLogin() {
                   onChange={changeHandler}
                   placeholder="Email"
                 />
-                <label >Email: admin@gmail.com</label>
+                <label>Email: admin@gmail.com</label>
                 <input
                   className="mt-3 p-2 border rounded dark:bg-slate-700"
                   type="password"
@@ -84,14 +104,13 @@ function AdminLogin() {
                   onChange={changeHandler}
                   placeholder="Password"
                 />
-                <label >Password: admin</label>
+                <label>Password: admin</label>
                 <div className="flex mt-4 gap-3 w-full">
                   <input
                     type="submit"
                     value="Login"
                     className="bg-blue-500 text-white p-2 rounded cursor-pointer hover:bg-blue-600 w-full"
                   />
-
                 </div>
               </form>
             </div>

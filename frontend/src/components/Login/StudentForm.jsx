@@ -30,7 +30,7 @@ function StudentLogin() {
         {
           email: formData.email,
           password: formData.password,
-        }
+        },
       );
       if (response.data.data.user.roles !== "student") {
         toast.error("Access denied. Only students are allowed to log in.");
@@ -39,10 +39,25 @@ function StudentLogin() {
       }
       setSpinner(false);
       const { token } = response.data;
-      const name = response.data.data.user.name;
+      const user = response.data.data.user;
+
       localStorage.setItem("Student jwtToken", token);
-      localStorage.setItem("email", formData.email);
-      localStorage.setItem("Student Name", name);
+      localStorage.setItem("email", user.email);
+      localStorage.setItem("Student Name", user.name);
+
+      // Common authentication data
+      localStorage.setItem("authToken", token);
+      localStorage.setItem(
+        "currentUser",
+        JSON.stringify({
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.roles,
+          admissionStatus: user.admissionStatus,
+        }),
+      );
+
       if (response.data.data.user.admissionStatus === true) {
         navigate(`/student/dashboard`);
       } else {
@@ -69,8 +84,13 @@ function StudentLogin() {
           <div className="bg-white rounded-lg dark:bg-slate-800 dark:text-white dark:border-gray-200 dark:border shadow-lg p-8 w-full max-w-md">
             <div className="flex flex-col  items-center">
               <h2 className="font-bold text-2xl">Student Login</h2>
-              <p className="text-sm mt-4 dark:text-gray-300">If you are already a member, easy login</p>
-              <form className="flex flex-col  gap-3 mt-4 w-full dark:bg-slate-800" onSubmit={submitHandler}>
+              <p className="text-sm mt-4 dark:text-gray-300">
+                If you are already a member, easy login
+              </p>
+              <form
+                className="flex flex-col  gap-3 mt-4 w-full dark:bg-slate-800"
+                onSubmit={submitHandler}
+              >
                 <input
                   className="mt-3 p-2 border rounded dark:bg-slate-700"
                   type="email"
@@ -79,7 +99,7 @@ function StudentLogin() {
                   onChange={changeHandler}
                   placeholder="Email"
                 />
-                <label >Email: student@gmail.com</label>
+                <label>Email: student@gmail.com</label>
                 <input
                   className="mt-3 p-2 border rounded dark:bg-slate-700"
                   type="password"
@@ -88,7 +108,7 @@ function StudentLogin() {
                   onChange={changeHandler}
                   placeholder="Password"
                 />
-                <label >Password: pass123</label>
+                <label>Password: pass123</label>
                 <div className="flex mt-4 gap-3 w-full">
                   <input
                     type="submit"

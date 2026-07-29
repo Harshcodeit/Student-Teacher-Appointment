@@ -14,7 +14,7 @@ const getTeacherWithAppointments = async (id) => {
 
 const getRegisteredAppointments = async (id) => {
   return await Appointment.find({
-    "students.studentId": { $eq: [id] },
+    "students.studentId": id,
   });
 };
 
@@ -45,7 +45,7 @@ exports.register = catchAsync(async (req, res, next) => {
     newUser.roles,
     newUser.name,
     newUser.email,
-    newUser.admissionStatus
+    newUser.admissionStatus,
   );
 
   res.status(200).json({
@@ -58,23 +58,76 @@ exports.register = catchAsync(async (req, res, next) => {
   });
 });
 
+/*
+After the student is added to the appointment:
+find the teacher using the appointment’s sendBy email.
+obtain the teacher’s MongoDB ID.
+retrieve Socket.IO from Express
+emit only to teacher's private room
+*/
+
 exports.bookAppointment = catchAsync(async (req, res, next) => {
   const appointment = {
     _id: req.params.id,
   };
-  const existingStudent = await Appointment.findOne({
+
+  //get appointment student is trying to book
+  const selectedAppointMent = await Appointment.findById(req.params.id);
+
+  //-------------------Debugging
+  // console.log({
+  //   appointmentId: req.params.id,
+  //   studentId: req.user.id,
+  //   teacherEmail: selectedAppointMent.sendBy,
+  // });
+
+  if (!selectedAppointMent) {
+    return next(new AppError("Appointment was not found", 404));
+  }
+
+  // check if student already booked slot of this teacher before
+  const existingBooking = await Appointment.findOne({
+    sendBy: selectedAppointMent.sendBy,
     "students.studentId": req.user.id,
   });
-  console.log(existingStudent);
-  if (existingStudent) {
-    return next(new AppError("You have already booked the appointment", 500));
+
+  if (existingBooking) {
+    return next(
+      new AppError("You alredy have an appoinment with this teacher", 400),
+    );
   }
+
   /// mail
   const newAppointment = await Appointment.findOneAndUpdate(
     appointment,
     { $push: { students: { studentId: req.user.id, approved: false } } },
-    { new: true }
+    { new: true },
   );
+
+  if (!newAppointment) {
+    return next(new AppError("Appointment was not found", 404));
+  }
+
+  const teacher = await User.findOne({
+    email: newAppointment.sendBy,
+    roles: "teacher",
+  });
+
+  if (teacher) {
+    const io = req.app.get("io");
+
+    io.to(`user:${teacher._id}`).emit("appointment-requested", {
+      appointmentId: newAppointment._id,
+      studentId: req.user.id,
+      studentName: req.user.name,
+      teacherId: teacher._id,
+      scheduleAt: newAppointment.scheduleAt,
+      message: `${req.user.name} requested an appointment`,
+    });
+
+    console.log(`Appointment request sent to teacher room user:${teacher._id}`);
+  }
+
   // console.log(newAppointment)
   const scheduledDate = new Date(newAppointment.scheduleAt);
   const formattedDate = scheduledDate.toLocaleString("en-US", {
@@ -112,8 +165,6 @@ exports.bookAppointment = catchAsync(async (req, res, next) => {
   });
 });
 
-
-
 exports.getTeacherWithAppointments = catchAsync(async (req, res, next) => {
   const appointments = await getTeacherWithAppointments(req.user.id);
   res.status(200).json({
@@ -122,10 +173,37 @@ exports.getTeacherWithAppointments = catchAsync(async (req, res, next) => {
   });
 });
 
+// exports.registeredAppointments = catchAsync(async (req, res, next) => {
+//   const appointments = await getRegisteredAppointments(req.user.id);
+//   res.status(200).json({
+//     status: "Success",
+//     appointments,
+//   });
+// });
+
 exports.registeredAppointments = catchAsync(async (req, res, next) => {
   const appointments = await getRegisteredAppointments(req.user.id);
+
+  const formattedAppointments = appointments.map((appointment) => {
+    const studentEntry = appointment.students.find(
+      (student) => student.studentId.toString() === req.user.id.toString(),
+    );
+
+    return {
+      ...appointment.toObject(),
+      approvalStatus: studentEntry?.approved === true ? "approved" : "pending",
+    };
+  });
+
+  console.log(
+    formattedAppointments.map((appointment) => ({
+      id: appointment._id,
+      status: appointment.approvalStatus,
+    })),
+  );
+
   res.status(200).json({
     status: "Success",
-    appointments,
+    appointments: formattedAppointments,
   });
 });

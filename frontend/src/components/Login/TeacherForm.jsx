@@ -31,7 +31,7 @@ function Teacher() {
         {
           email: formData.email,
           password: formData.password,
-        }
+        },
       );
       if (response.data.data.user.roles !== "teacher") {
         toast.error("Access denied. Only teachers are allowed to log in.");
@@ -40,9 +40,23 @@ function Teacher() {
       }
       setSpinner(false);
       const { token } = response.data;
-      const name = response.data.data.user.name;
+      const user = response.data.data.user;
       localStorage.setItem("Teacher jwtToken", token);
-      localStorage.setItem("Teacher Name", name);
+      localStorage.setItem("Teacher Name", user.name);
+
+      // Common Authentication data
+      localStorage.setItem("authToken", token);
+      localStorage.setItem(
+        "currentUser",
+        JSON.stringify({
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.roles,
+          admissionStatus: user.admissionStatus,
+        }),
+      );
+
       navigate("/teacher/dashboard");
       toast.success("Logged in");
     } catch (error) {
@@ -67,8 +81,13 @@ function Teacher() {
             <div className="bg-white rounded-lg dark:bg-slate-800 dark:text-white dark:border-gray-200 dark:border shadow-lg p-8 w-full max-w-md">
               <div className="flex flex-col items-center">
                 <h2 className="font-bold text-2xl">Teacher Login</h2>
-                <p className="text-sm mt-4">If you are already a member, easy login</p>
-                <form className="flex flex-col gap-3 mt-4 w-full" onSubmit={submitHandler}>
+                <p className="text-sm mt-4">
+                  If you are already a member, easy login
+                </p>
+                <form
+                  className="flex flex-col gap-3 mt-4 w-full"
+                  onSubmit={submitHandler}
+                >
                   <input
                     className="mt-3 p-2 border rounded dark:bg-slate-700"
                     type="email"
@@ -93,7 +112,6 @@ function Teacher() {
                       value="Login"
                       className="bg-blue-500 text-white p-2 rounded cursor-pointer hover:bg-blue-600 w-full"
                     />
-
                   </div>
                 </form>
               </div>

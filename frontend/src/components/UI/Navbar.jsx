@@ -6,7 +6,6 @@ import { FaMoon, FaSun } from "react-icons/fa";
 import { ThemeContext } from "../../context/ThemeContext";
 import { useContext } from "react";
 
-
 const Navbar = () => {
   const navigate = useNavigate();
   const isRootRoute = location.pathname === "/";
@@ -20,13 +19,20 @@ const Navbar = () => {
     localStorage.getItem("Student Name") ||
     localStorage.getItem("Teacher Name") ||
     localStorage.getItem("Admin Name");
+
   const changeHandler = () => {
-    localStorage.removeItem("Teacher jwtToken")
-    localStorage.removeItem("Student jwtToken") 
+    localStorage.removeItem("Teacher jwtToken");
+    localStorage.removeItem("Student jwtToken");
     localStorage.removeItem("jwtToken");
-    localStorage.removeItem("Student Name") 
-    localStorage.removeItem("Teacher Name") 
+
+    localStorage.removeItem("Student Name");
+    localStorage.removeItem("Teacher Name");
     localStorage.removeItem("Admin Name");
+
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("email");
+
     toast.success("Logout Successfully");
     navigate("/");
   };
@@ -53,7 +59,6 @@ const Navbar = () => {
           >
             Tutor-Time
           </Link>
-
 
           <div className="flex items-center w-auto">
             {userData && (

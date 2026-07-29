@@ -4,8 +4,13 @@ import toast from "react-hot-toast";
 import axios from "axios";
 import Header from "../../components/Header";
 import Spinner from "../../components/UI/Spinner";
+
+import { useSocket } from "../../context/SocketContext";
+
 function Student() {
   const navigate = useNavigate();
+  const { socket } = useSocket();
+
   const [lectureDetails, setLectureDetails] = useState([]);
   const [email, setEmail] = useState("");
   const [teacherEmail, setTeacherEmail] = useState("");
@@ -18,13 +23,14 @@ function Student() {
       const jwtToken = localStorage.getItem("Student jwtToken");
 
       const response = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL
+        `${
+          import.meta.env.VITE_BACKEND_URL
         }/api/v1/student/appointment/getRegisteredAppointments`,
         {
           headers: {
             Authorization: `Bearer ${jwtToken}`,
           },
-        }
+        },
       );
       // console.log(response.data.appointments);
       setLectureDetails(response.data.appointments);
@@ -34,35 +40,90 @@ function Student() {
     }
   };
 
+  const fetchData = async () => {
+    try {
+      const jwtToken = localStorage.getItem("Student jwtToken");
+
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/v1/admin`,
+        {
+          headers: {
+            Authorization: `Bearer ${jwtToken}`,
+          },
+        },
+      );
+
+      setTeachers(response.data.data.users);
+    } catch (error) {
+      console.error("Error fetching teachers:", error);
+    }
+  };
+
   useEffect(() => {
     ///////////////////////////////////////////////////////////////
     const emailAdd = localStorage.getItem("email");
     setEmail(emailAdd);
-    // console.log(emailAdd);
-    const fetchData = async () => {
-      try {
-        const jwtToken = localStorage.getItem("Student jwtToken");
-        if (jwtToken == null) {
-          navigate("/student/login");
-        } else {
-          const response = await axios.get(
-            `${import.meta.env.VITE_BACKEND_URL}/api/v1/admin`,
-            {
-              headers: {
-                Authorization: `Bearer ${jwtToken}`,
-              },
-            }
-          );
-          // console.log(response.data.data.users);
-          setTeachers(response.data.data.users);
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
-    };
+
+    const jwtToken = localStorage.getItem("Student jwtToken");
+    if (jwtToken == null) {
+      navigate("/student/login");
+      return;
+    }
     fetchData();
     fetchTable();
   }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleAppointmentStatusUpdated = (data) => {
+      console.log("Appointment status updated:", data);
+
+      if (data.status === "approved") {
+        toast.success(`${data.teacherName} approved your appointment`);
+      }
+
+      if (data.status === "rejected") {
+        toast.error(`${data.teacherName} rejected your appointment`);
+      }
+
+      // Refetches the latest appointment state
+      fetchTable();
+    };
+
+    const handleAppointmentCreated = (data) => {
+      console.log("Appointment created:", data);
+
+      toast.success(`${data.teacherName} added a new appointment slot`);
+
+      // Refresh teachers and their available slots
+      fetchData();
+    };
+
+    const handleAppointmentDeleted = (data) => {
+      console.log("Appointment deleted:", data);
+
+      toast(`${data.teacherName} cancelled an appointment slot`);
+
+      // Refresh available slots
+      fetchData();
+
+      // Also refresh registered appointments in case
+      // this student had booked the deleted slot
+      fetchTable();
+    };
+
+    socket.on("appointment-status-updated", handleAppointmentStatusUpdated);
+    socket.on("appointment-created", handleAppointmentCreated);
+    socket.on("appointment-deleted", handleAppointmentDeleted);
+
+    return () => {
+      socket.off("appointment-status-updated", handleAppointmentStatusUpdated);
+    };
+
+    socket.off("appointment-created", handleAppointmentCreated);
+    socket.off("appointment-deleted", handleAppointmentDeleted);
+  }, [socket]);
 
   const [formData, setFormData] = useState({
     message: "",
@@ -101,7 +162,7 @@ function Student() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${jwtToken}`,
           },
-        }
+        },
       );
 
       if (response.status === 200) {
@@ -122,7 +183,8 @@ function Student() {
     const jwtToken = localStorage.getItem("Student jwtToken");
     await axios
       .patch(
-        `${import.meta.env.VITE_BACKEND_URL
+        `${
+          import.meta.env.VITE_BACKEND_URL
         }/api/v1/student/appointment/${appointmentId}`,
         {
           scheduleAt: scheduleAt,
@@ -131,7 +193,7 @@ function Student() {
           headers: {
             Authorization: `Bearer ${jwtToken}`,
           },
-        }
+        },
       )
       .then((response) => {
         setSpinner(false);
@@ -141,8 +203,8 @@ function Student() {
       })
       .catch((error) => {
         setSpinner(false);
-        console.error("Error booking appointment:", error);
-        console.log(error);
+        console.log("Booking error response:", error.response?.data);
+        console.log("Booking error status:", error.response?.status);
         toast.error("Already booked appointment");
       });
   };
@@ -198,7 +260,7 @@ function Student() {
                         type="submit"
                         value="Send Message"
                         className="ml-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                      // onClick={() => setShowModal(false)}
+                        // onClick={() => setShowModal(false)}
                       />
                     </div>
                   </form>
@@ -228,6 +290,7 @@ function Student() {
                       {/* <th className="px-4 py-2">Subject</th> */}
                       <th className="px-4 py-2">Date</th>
                       <th className="px-4 py-2">Time Slot</th>
+                      <th className="px-4 py-2">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -244,6 +307,18 @@ function Student() {
                         </td>
                         <td className="border px-4 py-2">
                           {formatTime(detail.scheduleAt)}
+                        </td>
+
+                        <td className="border px-4 py-2">
+                          {detail.approvalStatus === "approved" ? (
+                            <span className="rounded-full bg-green-100 px-3 py-1 text-green-700">
+                              Approved
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-yellow-100 px-3 py-1 text-yellow-700">
+                              Waiting for approval
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -291,7 +366,7 @@ function Student() {
                                   <p className="text-gray-700 text-base dark:text-gray-400">
                                     Timing:{" "}
                                     {new Date(
-                                      appointment.scheduleAt
+                                      appointment.scheduleAt,
                                     ).toLocaleTimeString([], {
                                       hour: "2-digit",
                                       minute: "2-digit",
@@ -303,7 +378,7 @@ function Student() {
                                       onClick={() =>
                                         handleBookAppointment(
                                           appointment._id,
-                                          appointment.scheduleAt
+                                          appointment.scheduleAt,
                                         )
                                       }
                                     >
@@ -311,7 +386,7 @@ function Student() {
                                     </button>
                                   </div>
                                 </div>
-                              )
+                              ),
                             )
                           ) : (
                             <div className="d-flex">

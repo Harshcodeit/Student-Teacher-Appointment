@@ -7,8 +7,25 @@ import Header from "../../components/Header";
 import Spinner from "../../components/UI/Spinner";
 import { MdDelete } from "react-icons/md";
 
+import { useSocket } from "../../context/SocketContext";
+
+/*
+The teacher dashboard  listens for:
+appointment-requested
+When the event arrives:
+Event received
+    ↓
+Toast appears
+    ↓
+fetchData() runs
+    ↓
+Pending appointment cards refresh
+ */
+
 function Teacher() {
   const navigate = useNavigate();
+  const { socket } = useSocket();
+
   const [cards, setCards] = useState([]);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState("");
   const [highlightedTimeSlot, setHighlightedTimeSlot] = useState("");
@@ -16,6 +33,8 @@ function Teacher() {
   const [spinner, setSpinner] = useState(false);
   const [messageModal, setMessageModal] = useState(false);
   const [seduleModal, setSeduleModal] = useState(false);
+
+  const [expandedAppointmentId, setExpandedAppointmentId] = useState(null);
 
   const getCurrentDate = () => {
     const currentDate = new Date();
@@ -38,13 +57,14 @@ function Teacher() {
         navigate("/teacher/login");
       } else {
         const response = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL
+          `${
+            import.meta.env.VITE_BACKEND_URL
           }/api/v1/teachers/getAllPendingStudents`,
           {
             headers: {
               Authorization: `Bearer ${jwtToken}`,
             },
-          }
+          },
         );
         // console.log(response.data.students);
         setCards(response.data.students);
@@ -68,7 +88,7 @@ function Teacher() {
                   params: {
                     email: emailToFilter,
                   },
-                }
+                },
               );
 
               if (messageResponse.status === 200) {
@@ -96,7 +116,7 @@ function Teacher() {
           headers: {
             Authorization: `Bearer ${jwtToken}`,
           },
-        }
+        },
       );
       console.log(response);
       setTableAppointments(response.data.appointments);
@@ -105,31 +125,52 @@ function Teacher() {
       console.error("Error fetching data:", error);
     }
   };
+
   useEffect(() => {
     fetchData();
     fetchTeacherData();
   }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleAppointmentRequested = (data) => {
+      console.log("New appointment request:", data);
+
+      toast.success(`${data.studentName} requested an appointment`);
+
+      fetchData();
+      fetchTeacherData();
+    };
+
+    socket.on("appointment-requested", handleAppointmentRequested);
+
+    return () => {
+      socket.off("appointment-requested", handleAppointmentRequested);
+    };
+  }, [socket]);
 
   const handleDeleteAppointment = async (appointmentId) => {
     try {
       const jwtToken = localStorage.getItem("Teacher jwtToken");
 
       const response = await axios.delete(
-        `${import.meta.env.VITE_BACKEND_URL
+        `${
+          import.meta.env.VITE_BACKEND_URL
         }/api/v1/teachers/reschedule/${appointmentId}`,
         {
           headers: {
             Authorization: `Bearer ${jwtToken}`,
           },
-        }
+        },
       );
 
       toast.success("Appoinment Deleted Successfully");
       if (response.status === 200) {
         setTableAppointments((prevAppointments) =>
           prevAppointments.filter(
-            (appointment) => appointment._id !== appointmentId
-          )
+            (appointment) => appointment._id !== appointmentId,
+          ),
         );
       }
     } catch (error) {
@@ -151,7 +192,7 @@ function Teacher() {
           params: {
             email: emailToFilter,
           },
-        }
+        },
       );
       // console.log(response.data);
       if (response.status === 200) {
@@ -175,83 +216,61 @@ function Teacher() {
       setSpinner(true);
       const jwtToken = localStorage.getItem("Teacher jwtToken");
 
-      const url = `${import.meta.env.VITE_BACKEND_URL
-        }/api/v1/teachers/changeApprovalStatus/${teacherAppointmentId}/${studentId}`;
+      const url = `${
+        import.meta.env.VITE_BACKEND_URL
+      }/api/v1/teachers/changeApprovalStatus/${teacherAppointmentId}/${studentId}`;
 
       const headers = {
         Authorization: `Bearer ${jwtToken}`,
       };
 
-      const response = await axios.patch(url, null, { headers });
-      setSpinner(false);
-      // console.log("Approval status changed successfully", response.data);
+      await axios.patch(url, null, { headers });
 
-      setCards((prevCards) => {
-        const updatedCards = prevCards.map((schedule) => {
-          return {
-            ...schedule,
-            students: schedule.students.filter(
-              (student) => student.studentId._id !== studentId
-            ),
-          };
-        });
+      await Promise.all([fetchData(), fetchTeacherData()]);
 
-        return updatedCards;
-      });
       toast.success("Student Added");
     } catch (error) {
-      setSpinner(false);
       console.error("Error changing approval status:", error.message);
+    } finally {
+      setSpinner(false);
     }
   };
   const handleStudentReject = async (studentId, teacherAppointmentId) => {
     try {
       setSpinner(true);
       const jwtToken = localStorage.getItem("Teacher jwtToken");
-      const url = `${import.meta.env.VITE_BACKEND_URL
-        }/api/v1/teachers/changeApprovalStatus/${teacherAppointmentId}/${studentId}`;
+      const url = `${
+        import.meta.env.VITE_BACKEND_URL
+      }/api/v1/teachers/changeApprovalStatus/${teacherAppointmentId}/${studentId}`;
       const headers = {
         Authorization: `Bearer ${jwtToken}`,
       };
 
-      const response = await axios.delete(url, { headers });
-      setSpinner(false);
-      // console.log("Student rejected:", response.data);
-      setCards((prevCards) => {
-        const updatedCards = prevCards.map((schedule) => {
-          return {
-            ...schedule,
-            students: schedule.students.filter(
-              (student) => student.studentId._id !== studentId
-            ),
-          };
-        });
-        return updatedCards;
-      });
-      toast.info("Student Rejected");
+      await axios.delete(url, { headers });
+
+      await Promise.all([fetchData(), fetchTeacherData()]);
+
+      toast.error("Student Rejected");
     } catch (error) {
-      setSpinner(false);
       console.error("Error changing approval status:", error.message);
+    } finally {
+      setSpinner(false);
     }
   };
 
   const handleTimeSlotSelect = (timeSlot) => {
-
-
     setSelectedTimeSlot(timeSlot);
     setHighlightedTimeSlot(timeSlot);
   };
 
   //appoinment assign
   const handleSubmit = async (event) => {
-
     event.preventDefault();
     if (selectedTimeSlot === "") {
     } else {
-
-      setSeduleModal(false)
-      setHighlightedTimeSlot('')
-      setSelectedTimeSlot("")
+      setSeduleModal(false);
+      setHighlightedTimeSlot("");
+      setSelectedTimeSlot("");
     }
     // console.log("Time Slot = ", selectedTimeSlot);
 
@@ -266,7 +285,7 @@ function Teacher() {
           headers: {
             Authorization: `Bearer ${jwtToken}`,
           },
-        }
+        },
       );
       fetchTeacherData();
       toast.success("Appointment scheduled successfully:");
@@ -287,141 +306,157 @@ function Teacher() {
       ) : (
         <>
           {/* header */}
-          <Header name="Teacher Dashboard" style="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+          <Header
+            name="Teacher Dashboard"
+            style="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"
+          />
 
           {/* teacher slot modal */}
-          {seduleModal && (<div
-            className="fixed z-10 inset-0 overflow-y-auto"
-          >
-            <div className="flex justify-center items-center min-h-screen text-center">
-              <div
-                className="fixed inset-0 bg-gray-500 bg-opacity-90 transition-opacity"
-              ></div>
-              <div className="inline-block align-bottom bg-white  rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div className="bg-white dark:bg-slate-800  px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h1
-                    className="text-lg font-medium text-gray-900 dark:text-white"
-                  >
-                    Update Lectures
-                  </h1>
-                  <form onSubmit={handleSubmit}>
-                    <div className="mt-3 text-center sm:mt-5">
-                      <div className="mt-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-4 dark:text-gray-400">
-                          Time Slot
-                        </label>
-                        <div className="mt-1 flex gap-4 justify-center">
-                          <button
-                            type="button"
-                            className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md ${highlightedTimeSlot ===
-                              `${getCurrentDate()}T14:00:00`
-                              ? "text-white bg-blue-600 hover:bg-blue-700"
-                              : "text-blue-700 bg-blue-100 hover:bg-blue-200"
-                              }`}
-                            onClick={() =>
-                              handleTimeSlotSelect(
+          {seduleModal && (
+            <div className="fixed z-10 inset-0 overflow-y-auto">
+              <div className="flex justify-center items-center min-h-screen text-center">
+                <div className="fixed inset-0 bg-gray-500 bg-opacity-90 transition-opacity"></div>
+                <div className="inline-block align-bottom bg-white  rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                  <div className="bg-white dark:bg-slate-800  px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h1 className="text-lg font-medium text-gray-900 dark:text-white">
+                      Update Lectures
+                    </h1>
+                    <form onSubmit={handleSubmit}>
+                      <div className="mt-3 text-center sm:mt-5">
+                        <div className="mt-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-4 dark:text-gray-400">
+                            Time Slot
+                          </label>
+                          <div className="mt-1 flex gap-4 justify-center">
+                            <button
+                              type="button"
+                              className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md ${
+                                highlightedTimeSlot ===
                                 `${getCurrentDate()}T14:00:00`
-                              )
-                            }
-                          >
-                            2pm-4pm
-                          </button>
-                          <button
-                            type="button"
-                            className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md ${highlightedTimeSlot ===
-                              `${getCurrentDate()}T17:00:00`
-                              ? "text-white bg-blue-600 hover:bg-blue-700"
-                              : "text-blue-700 bg-blue-100 hover:bg-blue-200"
+                                  ? "text-white bg-blue-600 hover:bg-blue-700"
+                                  : "text-blue-700 bg-blue-100 hover:bg-blue-200"
                               }`}
-                            onClick={() =>
-                              handleTimeSlotSelect(
+                              onClick={() =>
+                                handleTimeSlotSelect(
+                                  `${getCurrentDate()}T14:00:00`,
+                                )
+                              }
+                            >
+                              2pm-4pm
+                            </button>
+                            <button
+                              type="button"
+                              className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md ${
+                                highlightedTimeSlot ===
                                 `${getCurrentDate()}T17:00:00`
-                              )
-                            }
-                          >
-                            5pm-6pm
-                          </button>
-                          <button
-                            type="button"
-                            className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md ${highlightedTimeSlot ===
-                              `${getCurrentDate()}T19:00:00`
-                              ? "text-white bg-blue-600 hover:bg-blue-700"
-                              : "text-blue-700 bg-blue-100 hover:bg-blue-200"
+                                  ? "text-white bg-blue-600 hover:bg-blue-700"
+                                  : "text-blue-700 bg-blue-100 hover:bg-blue-200"
                               }`}
-                            onClick={() =>
-                              handleTimeSlotSelect(
+                              onClick={() =>
+                                handleTimeSlotSelect(
+                                  `${getCurrentDate()}T17:00:00`,
+                                )
+                              }
+                            >
+                              5pm-6pm
+                            </button>
+                            <button
+                              type="button"
+                              className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md ${
+                                highlightedTimeSlot ===
                                 `${getCurrentDate()}T19:00:00`
-                              )
-                            }
-                          >
-                            7pm-8pm
-                          </button>
+                                  ? "text-white bg-blue-600 hover:bg-blue-700"
+                                  : "text-blue-700 bg-blue-100 hover:bg-blue-200"
+                              }`}
+                              onClick={() =>
+                                handleTimeSlotSelect(
+                                  `${getCurrentDate()}T19:00:00`,
+                                )
+                              }
+                            >
+                              7pm-8pm
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="mt-5 sm:mt-6 flex justify-center">
-                      <button
-                        className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gray-500 hover:bg-gray-700 hover:cursor-pointer"
-                        onClick={() => {
-                          setSeduleModal(false)
-                          setHighlightedTimeSlot('')
-                          setSelectedTimeSlot("")
-                        }}
-                      >
-                        Close
-
-                      </button>
-                      <input
-                        type="submit"
-                        className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 ml-4 hover:cursor-pointer"
-                      />
-                    </div>
-                  </form>
+                      <div className="mt-5 sm:mt-6 flex justify-center">
+                        <button
+                          className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gray-500 hover:bg-gray-700 hover:cursor-pointer"
+                          onClick={() => {
+                            setSeduleModal(false);
+                            setHighlightedTimeSlot("");
+                            setSelectedTimeSlot("");
+                          }}
+                        >
+                          Close
+                        </button>
+                        <input
+                          type="submit"
+                          className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 ml-4 hover:cursor-pointer"
+                        />
+                      </div>
+                    </form>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>)}
+          )}
           {/* student message modal */}
-          {messageModal && (<div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex justify-center items-center min-h-screen text-center bg-gray-500 bg-opacity-90 transition-opacity">
-              <div className="bg-white rounded-lg dark:bg-slate-800 shadow-xl w-full max-w-lg mx-4 sm:mx-auto">
-                <div className="border-b border-gray-200 p-4">
-                  <h5 className="text-lg font-medium text-gray-900 dark:text-white">Student Message</h5>
-                </div>
-                <div className="p-4 space-y-4">
-                  {/* Render the messages in the modal */}
-                  {messages.map((message) => (
-                    <div key={message._id} className="border border-gray-200 p-2 rounded">
-                      <p className="text-gray-700 dark:text-white">{message.messageText}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-end border-t border-gray-200 p-4">
-                  <button
-                    type="button"
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                    onClick={() => setMessageModal(false)}
-                  >
-                    Close
-                  </button>
-                  <button type="button" className="ml-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" onClick={() => {/* Code to send message and close the modal */ }}>
-                    Send Message
-                  </button>
+          {messageModal && (
+            <div className="fixed inset-0 z-50 overflow-y-auto">
+              <div className="flex justify-center items-center min-h-screen text-center bg-gray-500 bg-opacity-90 transition-opacity">
+                <div className="bg-white rounded-lg dark:bg-slate-800 shadow-xl w-full max-w-lg mx-4 sm:mx-auto">
+                  <div className="border-b border-gray-200 p-4">
+                    <h5 className="text-lg font-medium text-gray-900 dark:text-white">
+                      Student Message
+                    </h5>
+                  </div>
+                  <div className="p-4 space-y-4">
+                    {/* Render the messages in the modal */}
+                    {messages.map((message) => (
+                      <div
+                        key={message._id}
+                        className="border border-gray-200 p-2 rounded"
+                      >
+                        <p className="text-gray-700 dark:text-white">
+                          {message.messageText}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-end border-t border-gray-200 p-4">
+                    <button
+                      type="button"
+                      className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                      onClick={() => setMessageModal(false)}
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      className="ml-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                      onClick={() => {
+                        /* Code to send message and close the modal */
+                      }}
+                    >
+                      Send Message
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>)}
-
+          )}
 
           {/* dashbord container */}
-          <div className="dark:bg-slate-900 dark:text-white">
-
-            <section className="container p-6  " >
+          <div className="min-h-screen overflow-y-auto dark:bg-slate-900 dark:text-white">
+            <section className="container p-6  ">
               <h2 className="text-2xl font-semibold mb-4">Status</h2>
               <hr className="mt-0 mb-4" />
               <div className="flex justify-center text-center">
-                <div className="bg-blue-500 min-w-80 text-white rounded-lg shadow-lg flex flex-col justify-between h-40"
-                  onClick={() => setSeduleModal(true)}>
+                <div
+                  className="bg-blue-500 min-w-80 text-white rounded-lg shadow-lg flex flex-col justify-between h-40"
+                  onClick={() => setSeduleModal(true)}
+                >
                   <div className="p-4 flex flex-col gap-4">
                     <p className="text-2xl font-bold">Schedule Appointment</p>
                     <p className="text-xl">{tableAppointments.length}</p>
@@ -432,11 +467,12 @@ function Teacher() {
                 </div>
               </div>
 
-
               {/* table info container */}
 
               <div className="py-4 ">
-                <h2 className="text-2xl font-semibold mb-4">Your All Upcoming Appointment Details</h2>
+                <h2 className="text-2xl font-semibold mb-4">
+                  Your All Upcoming Appointment Details
+                </h2>
                 <hr className="mt-0 mb-4" />
                 <div className="hidden md:block overflow-x-auto">
                   <table className="min-w-full text-center ">
@@ -447,6 +483,7 @@ function Teacher() {
                         <th className="px-4 py-2">Email</th>
                         <th className="px-4 py-2">Date</th>
                         <th className="px-4 py-2">Schedule Time</th>
+                        <th className="px-4 py-2">Students</th>
                         <th className="px-4 py-2">Delete</th>
                       </tr>
                     </thead>
@@ -457,12 +494,76 @@ function Teacher() {
                         const formattedTime = scheduleDate.toLocaleTimeString();
 
                         return (
-                          <tr key={index} className="hover:bg-gray-100 dark:hover:bg-slate-950">
+                          <tr
+                            key={index}
+                            className="hover:bg-gray-100 dark:hover:bg-slate-950"
+                          >
                             <td className="border px-4 py-2">{index + 1}</td>
-                            <td className="border px-4 py-2">{appointment.name}</td>
-                            <td className="border px-4 py-2">{appointment.sendBy}</td>
-                            <td className="border px-4 py-2">{formattedDate}</td>
-                            <td className="border px-4 py-2">{formattedTime}</td>
+                            <td className="border px-4 py-2">
+                              {appointment.name}
+                            </td>
+                            <td className="border px-4 py-2">
+                              {appointment.sendBy}
+                            </td>
+                            <td className="border px-4 py-2">
+                              {formattedDate}
+                            </td>
+                            <td className="border px-4 py-2">
+                              {formattedTime}
+                            </td>
+                            <td className="border px-4 py-2">
+                              <p>
+                                {appointment.students?.length || 0} registered
+                              </p>
+
+                              {appointment.students?.length > 0 && (
+                                <button
+                                  type="button"
+                                  className="mt-1 text-blue-500 underline"
+                                  onClick={() =>
+                                    setExpandedAppointmentId((currentId) =>
+                                      currentId === appointment._id
+                                        ? null
+                                        : appointment._id,
+                                    )
+                                  }
+                                >
+                                  {expandedAppointmentId === appointment._id
+                                    ? "Hide students"
+                                    : "View students"}
+                                </button>
+                              )}
+
+                              {expandedAppointmentId === appointment._id && (
+                                <div className="mt-2 space-y-2 text-left">
+                                  {appointment.students.map((studentEntry) => (
+                                    <div
+                                      key={studentEntry.studentId?._id}
+                                      className="rounded border p-2"
+                                    >
+                                      <p>
+                                        <strong>Name:</strong>{" "}
+                                        {studentEntry.studentId?.name ||
+                                          "Unavailable"}
+                                      </p>
+
+                                      <p>
+                                        <strong>Email:</strong>{" "}
+                                        {studentEntry.studentId?.email ||
+                                          "Unavailable"}
+                                      </p>
+
+                                      <p>
+                                        <strong>Status:</strong>{" "}
+                                        {studentEntry.approved
+                                          ? "Approved"
+                                          : "Pending"}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
                             <td className="border px-4 py-2">
                               <button
                                 className="bg-red-500 text-white rounded px-4 py-2"
@@ -481,33 +582,105 @@ function Teacher() {
                 </div>
                 <div className="block md:hidden space-y-4">
                   {tableAppointments.map((appointment, index) => {
-
                     const scheduleDate = new Date(appointment.scheduleAt);
                     const formattedDate = scheduleDate.toLocaleDateString();
                     const formattedTime = scheduleDate.toLocaleTimeString();
 
                     return (
-                      <div key={index} className="border border-gray-200 rounded-lg p-4 shadow-md bg-white dark:bg-slate-800 hover:dark:bg-slate-950">
+                      <div
+                        key={index}
+                        className="border border-gray-200 rounded-lg p-4 shadow-md bg-white dark:bg-slate-800 hover:dark:bg-slate-950"
+                      >
                         <div className="flex justify-between items-center mb-2">
-                          <p className="font-semibold text-lg">Appointment {index + 1}</p>
+                          <p className="font-semibold text-lg">
+                            Appointment {index + 1}
+                          </p>
                           <button
                             className="bg-red-500 text-white rounded-full p-2"
-                            onClick={() => handleDeleteAppointment(appointment._id)}
+                            onClick={() =>
+                              handleDeleteAppointment(appointment._id)
+                            }
                           >
                             <MdDelete />
                           </button>
                         </div>
-                        <p className="mb-1"><span className="font-semibold">Name:</span> {appointment.name}</p>
-                        <p className="mb-1"><span className="font-semibold">Email:</span> {appointment.sendBy}</p>
-                        <p className="mb-1"><span className="font-semibold">Date:</span> {formattedDate}</p>
-                        <p><span className="font-semibold">Schedule Time:</span> {formattedTime}</p>
+                        <p className="mb-1">
+                          <span className="font-semibold">Name:</span>{" "}
+                          {appointment.name}
+                        </p>
+                        <p className="mb-1">
+                          <span className="font-semibold">Email:</span>{" "}
+                          {appointment.sendBy}
+                        </p>
+                        <p className="mb-1">
+                          <span className="font-semibold">Date:</span>{" "}
+                          {formattedDate}
+                        </p>
+                        <p>
+                          <span className="font-semibold">Schedule Time:</span>{" "}
+                          {formattedTime}
+                        </p>
+                        <div className="mt-3">
+                          <p>
+                            <span className="font-semibold">
+                              Registered students:
+                            </span>{" "}
+                            {appointment.students?.length || 0}
+                          </p>
+
+                          {appointment.students?.length > 0 && (
+                            <button
+                              type="button"
+                              className="mt-1 text-blue-500 underline"
+                              onClick={() =>
+                                setExpandedAppointmentId((currentId) =>
+                                  currentId === appointment._id
+                                    ? null
+                                    : appointment._id,
+                                )
+                              }
+                            >
+                              {expandedAppointmentId === appointment._id
+                                ? "Hide students"
+                                : "View students"}
+                            </button>
+                          )}
+
+                          {expandedAppointmentId === appointment._id && (
+                            <div className="mt-2 space-y-2">
+                              {appointment.students.map((studentEntry) => (
+                                <div
+                                  key={studentEntry.studentId?._id}
+                                  className="rounded border p-2"
+                                >
+                                  <p>
+                                    <strong>Name:</strong>{" "}
+                                    {studentEntry.studentId?.name ||
+                                      "Unavailable"}
+                                  </p>
+
+                                  <p>
+                                    <strong>Email:</strong>{" "}
+                                    {studentEntry.studentId?.email ||
+                                      "Unavailable"}
+                                  </p>
+
+                                  <p>
+                                    <strong>Status:</strong>{" "}
+                                    {studentEntry.approved
+                                      ? "Approved"
+                                      : "Pending"}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
               </div>
-
-
 
               {/* student card container */}
 
@@ -565,7 +738,7 @@ function Teacher() {
                                   onClick={() => {
                                     handleStudentApprove(
                                       studentId,
-                                      teacherAppointmentId
+                                      teacherAppointmentId,
                                     );
                                   }}
                                 >
@@ -576,7 +749,7 @@ function Teacher() {
                                   onClick={() => {
                                     handleStudentReject(
                                       studentId,
-                                      teacherAppointmentId
+                                      teacherAppointmentId,
                                     );
                                   }}
                                 >
@@ -609,12 +782,10 @@ function Teacher() {
                   ))}
                 </div>
               </div>
-
             </section>
           </div>
         </>
-      )
-      }
+      )}
     </>
   );
 }
