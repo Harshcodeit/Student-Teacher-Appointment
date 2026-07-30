@@ -202,10 +202,13 @@ function Student() {
         console.log("Appointment booked successfully:", response.data);
       })
       .catch((error) => {
-        setSpinner(false);
+        // setSpinner(false);
         console.log("Booking error response:", error.response?.data);
         console.log("Booking error status:", error.response?.status);
         toast.error("Already booked appointment");
+      })
+      .finally(() => {
+        setSpinner(false);
       });
   };
 

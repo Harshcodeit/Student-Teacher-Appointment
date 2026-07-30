@@ -142,7 +142,7 @@ exports.bookAppointment = catchAsync(async (req, res, next) => {
     hour12: true,
   });
 
-  let info = await transporter.sendMail({
+  let info = transporter.sendMail({
     from: '"tutor-time@brevo.com',
     to: newAppointment.sendBy,
     subject: "Appointment Request",

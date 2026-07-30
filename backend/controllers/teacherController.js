@@ -85,44 +85,6 @@ exports.createAppointment = catchAsync(async (req, res, next) => {
   });
 });
 
-// exports.approveAppointment = catchAsync(async (req, res) => {
-//   const appointment = await Appointment.findOneAndUpdate(
-//     { _id: req.params.id, "students.studentId": req.params.studentId },
-//     {
-//       $set: {
-//         "students.$.approved": true, // Set the 'approved' field to true for the matched student
-//       },
-//     },
-//   );
-//   // const studentEmail = await User.findById(req.params.studentId).select('email')
-//   // console.log(studentEmail)
-//   // const message = "your appointment is approved"
-
-//   // let info = await transporter.sendMail({from:req.user.email,to:studentEmail.email,subject:"Book appointment",body:message})
-
-//   const studentEmail = await User.findById(req.params.studentId).select(
-//     "email",
-//   );
-//   console.log(studentEmail);
-//   let info = await transporter.sendMail({
-//     from: '"tutor-time@brevo.com',
-//     to: studentEmail.email,
-//     subject: "Appointment Accepted",
-//     html: `
-//             <h2>Dear Student,</h2>
-//             <p>We are pleased to inform you that your appointment request has been successfully accepted by the teacher.</p>
-//             <p>Please make sure to join the session on time. If you have any questions or concerns, feel free to contact us.</p>
-//             <p>Thank you for using Tutor-Time, and we hope you have a productive session!</p>
-//             <p>Best regards,</p>
-//             <p>Tutor-Time</p>
-//             <p>Visit our website</p>
-
-//     `,
-//   });
-
-//   res.status(200).json({ message: "Approved" });
-// });
-
 exports.approveAppointment = catchAsync(async (req, res, next) => {
   const appointment = await Appointment.findOneAndUpdate(
     {
@@ -162,7 +124,7 @@ exports.approveAppointment = catchAsync(async (req, res, next) => {
 
   console.log(`Approval sent to student room user:${student._id}`);
 
-  await transporter.sendMail({
+  transporter.sendMail({
     from: '"tutor-time@brevo.com"',
     to: student.email,
     subject: "Appointment Accepted",
@@ -180,43 +142,6 @@ exports.approveAppointment = catchAsync(async (req, res, next) => {
     appointment,
   });
 });
-
-// exports.dissapproveAppointment = catchAsync(async (req, res) => {
-//   const appointment = await Appointment.findOneAndUpdate(
-//     { _id: req.params.id },
-//     {
-//       $pull: {
-//         students: { studentId: req.params.studentId },
-//       },
-//     },
-//   );
-//   // const studentEmail = await User.findById(req.params.studentId).select('email')
-//   // console.log(studentEmail)
-//   // const message = "Your appointment is not approved"
-//   // let info = await transporter.sendMail({from:req.user.email,to:studentEmail.email,subject:"Book appointment",body:message})
-
-//   const studentEmail = await User.findById(req.params.studentId).select(
-//     "email",
-//   );
-//   console.log(studentEmail);
-//   let info = await transporter.sendMail({
-//     from: "abutalhasheikh33@gmail.com",
-//     to: studentEmail.email,
-//     subject: "Appointment Rejected",
-//     html: `
-//         <h2>Dear Student,</h2>
-//         <p>We regret to inform you that your appointment request has been rejected by the teacher.</p>
-//         <p>If you have any questions or concerns, please reach out to us for further assistance.</p>
-//         <p>Thank you for using Tutor-Time, and we hope you understand the situation.</p>
-//         <p>Best regards,</p>
-//         <p>Tutor-Time</p>
-//         <p>Visit our website</p>
-
-//     `,
-//   });
-
-//   res.status(200).json({ message: "Student rejected" });
-// });
 
 exports.dissapproveAppointment = catchAsync(async (req, res, next) => {
   const appointment = await Appointment.findOneAndUpdate(
@@ -258,7 +183,7 @@ exports.dissapproveAppointment = catchAsync(async (req, res, next) => {
 
   console.log(`Rejection sent to student room user:${student._id}`);
 
-  await transporter.sendMail({
+  transporter.sendMail({
     from: '"tutor-time@brevo.com"',
     to: student.email,
     subject: "Appointment Rejected",
