@@ -299,6 +299,14 @@ function Teacher() {
     }
   };
 
+  const formatTime = (timeString) => {
+    return new Date(timeString).toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Kolkata",
+    });
+  };
+
   return (
     <>
       {spinner ? (
@@ -491,7 +499,6 @@ function Teacher() {
                       {tableAppointments.map((appointment, index) => {
                         const scheduleDate = new Date(appointment.scheduleAt);
                         const formattedDate = scheduleDate.toLocaleDateString();
-                        const formattedTime = scheduleDate.toLocaleTimeString();
 
                         return (
                           <tr
@@ -584,7 +591,7 @@ function Teacher() {
                   {tableAppointments.map((appointment, index) => {
                     const scheduleDate = new Date(appointment.scheduleAt);
                     const formattedDate = scheduleDate.toLocaleDateString();
-                    const formattedTime = scheduleDate.toLocaleTimeString();
+                    const formattedTime = formatTime(appointment.scheduleAt);
 
                     return (
                       <div

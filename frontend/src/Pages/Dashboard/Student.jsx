@@ -218,9 +218,10 @@ function Student() {
   };
 
   const formatTime = (timeString) => {
-    return new Date(timeString).toLocaleTimeString([], {
+    return new Date(timeString).toLocaleTimeString("en-IN", {
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "Asia/Kolkata",
     });
   };
 
@@ -367,13 +368,7 @@ function Student() {
                                   className="flex flex-col gap-4"
                                 >
                                   <p className="text-gray-700 text-base dark:text-gray-400">
-                                    Timing:{" "}
-                                    {new Date(
-                                      appointment.scheduleAt,
-                                    ).toLocaleTimeString([], {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    })}
+                                    Timing: {formatTime(appointment.scheduleAt)}
                                   </p>
                                   <div className="">
                                     <button
