@@ -499,6 +499,9 @@ function Teacher() {
                       {tableAppointments.map((appointment, index) => {
                         const scheduleDate = new Date(appointment.scheduleAt);
                         const formattedDate = scheduleDate.toLocaleDateString();
+                        const formattedTime = formattedDate(
+                          appointment.scheduleAt,
+                        );
 
                         return (
                           <tr
