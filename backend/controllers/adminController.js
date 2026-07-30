@@ -140,11 +140,11 @@ exports.approveStudent = catchAsync(async (req, res, next) => {
   await User.findByIdAndUpdate(
     req.params.id,
     { admissionStatus: true },
-    { where: { roles: "student" } }
+    { where: { roles: "student" } },
   );
   const studentEmail = await User.findById(req.params.id).select("email");
   // console.log("studentmail", studentEmail.email)
-  let info = await transporter.sendMail({
+  let info = transporter.sendMail({
     from: '"tutor-time@brevo.com',
     to: studentEmail.email,
     subject: "Appointment Accepted",
