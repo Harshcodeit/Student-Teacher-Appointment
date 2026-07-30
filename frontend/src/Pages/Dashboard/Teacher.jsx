@@ -504,7 +504,7 @@ function Teacher() {
                             timeZone: "Asia/Kolkata",
                           },
                         );
-                        const formattedTime = formattedDate(
+                        const formattedTime = formatTime(
                           appointment.scheduleAt,
                         );
 
