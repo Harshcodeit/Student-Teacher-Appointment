@@ -279,7 +279,7 @@ function Teacher() {
       const response = await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/api/v1/teachers/schedule`,
         {
-          scheduleAt: selectedTimeSlot,
+          scheduleAt: new Date(selectedTimeSlot).toISOString(),
         },
         {
           headers: {
