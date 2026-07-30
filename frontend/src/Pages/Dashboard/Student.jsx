@@ -16,6 +16,7 @@ function Student() {
   const [teacherEmail, setTeacherEmail] = useState("");
   const [teachers, setTeachers] = useState([]);
   const [spinner, setSpinner] = useState(false);
+  const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
 
   const fetchTable = async () => {
@@ -119,10 +120,10 @@ function Student() {
 
     return () => {
       socket.off("appointment-status-updated", handleAppointmentStatusUpdated);
-    };
 
-    socket.off("appointment-created", handleAppointmentCreated);
-    socket.off("appointment-deleted", handleAppointmentDeleted);
+      socket.off("appointment-created", handleAppointmentCreated);
+      socket.off("appointment-deleted", handleAppointmentDeleted);
+    };
   }, [socket]);
 
   const [formData, setFormData] = useState({
@@ -213,8 +214,13 @@ function Student() {
   };
 
   const formatDate = (dateString) => {
-    const options = { year: "numeric", month: "long", day: "numeric" };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+    const options = {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: "Asia/Kolkata",
+    };
+    return new Date(dateString).toLocaleDateString("en-IN", options);
   };
 
   const formatTime = (timeString) => {

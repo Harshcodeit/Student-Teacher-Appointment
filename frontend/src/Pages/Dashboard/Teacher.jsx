@@ -498,7 +498,12 @@ function Teacher() {
                     <tbody>
                       {tableAppointments.map((appointment, index) => {
                         const scheduleDate = new Date(appointment.scheduleAt);
-                        const formattedDate = scheduleDate.toLocaleDateString();
+                        const formattedDate = scheduleDate.toLocaleDateString(
+                          "en-IN",
+                          {
+                            timeZone: "Asia/Kolkata",
+                          },
+                        );
                         const formattedTime = formattedDate(
                           appointment.scheduleAt,
                         );
@@ -736,11 +741,7 @@ function Teacher() {
                                 Department: {department}
                               </p>
                               <p className="text-gray-600 mb-4 dark:text-gray-300">
-                                Timing:{" "}
-                                {new Date(scheduleAt).toLocaleTimeString([], {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
+                                Timing:{formatTime(scheduleAt)}
                               </p>
                               <div className="flex justify-between">
                                 <button
